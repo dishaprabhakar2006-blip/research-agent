@@ -57,7 +57,8 @@ def call_mistral(messages):
         },
         timeout=60
     )
-    resp.raise_for_status()
+    if not resp.ok:
+        raise Exception(f"Mistral error {resp.status_code}: {resp.text}")
     return resp.json()
 
 def run_tool(name, args):
