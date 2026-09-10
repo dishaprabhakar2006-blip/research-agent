@@ -42,24 +42,30 @@ TOOLS = [
     }
 ]
 
-def call_mistral(messages):
-    resp = requests.post(
-        "https://api.mistral.ai/v1/chat/completions",
-        headers={
-            "Authorization": f"Bearer {MISTRAL_API_KEY}",
-            "Content-Type": "application/json"
-        },
-        json={
-            "model": "mistral-small-latest",
-            "messages": messages,
-            "tools": TOOLS,
-            "tool_choice": "auto"
-        },
-        timeout=60
-    )
-    if not resp.ok:
-        raise Exception(f"Mistral error {resp.status_code}: {resp.text}")
-    return resp.json()
+def call_mistral(messages, retries=3):
+    import time
+    for attempt in range(retries):
+        resp = requests.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {os.getenv('OPENROUTER_API_KEY')}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": "mistralai/mistral-7b-instruct:free",
+                "messages": messages,
+                "tools": TOOLS,
+                "tool_choice": "auto"
+            },
+            timeout=60
+        )
+        if resp.status_code == 429:
+            time.sleep(30 * (attempt + 1))
+            continue
+        if not resp.ok:
+            raise Exception(f"API error {resp.status_code}: {resp.text}")
+        return resp.json()
+    raise Exception("Rate limit hit. Please try again in a minute.")
 
 def run_tool(name, args):
     if name == "web_search":
