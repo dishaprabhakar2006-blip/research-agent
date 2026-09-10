@@ -52,7 +52,7 @@ def call_mistral(messages, retries=3):
                 "Content-Type": "application/json"
             },
             json={
-                "model": "mistralai/mistral-7b-instruct:free",
+                "model": "mistralai/mistral-small-3.2-24b-instruct:free",
                 "messages": messages,
                 "tools": TOOLS,
                 "tool_choice": "auto"
