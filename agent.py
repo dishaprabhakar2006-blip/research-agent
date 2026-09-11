@@ -1,12 +1,13 @@
 import os
 import json
+import time
 import requests
 from tavily import TavilyClient
 from dotenv import load_dotenv
 
 load_dotenv()
 
-MISTRAL_API_KEY = os.getenv("MISTRAL_API_KEY")
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 tavily = TavilyClient(api_key=os.getenv("TAVILY_API_KEY"))
 
 TOOLS = [
@@ -42,30 +43,35 @@ TOOLS = [
     }
 ]
 
-def call_mistral(messages, retries=3):
-    import time
+def call_llm(messages, retries=3):
     for attempt in range(retries):
-        resp = requests.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {os.getenv('OPENROUTER_API_KEY')}",
-                "Content-Type": "application/json"
-            },
-            json={
-                "model": "mistralai/mistral-small-3.2-24b-instruct",
-                "messages": messages,
-                "tools": TOOLS,
-                "tool_choice": "auto"
-            },
-            timeout=60
-        )
-        if resp.status_code == 429:
-            time.sleep(30 * (attempt + 1))
-            continue
-        if not resp.ok:
-            raise Exception(f"API error {resp.status_code}: {resp.text}")
-        return resp.json()
-    raise Exception("Rate limit hit. Please try again in a minute.")
+        try:
+            resp = requests.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "model": "mistralai/mistral-small-3.2-24b-instruct",
+                    "messages": messages,
+                    "tools": TOOLS,
+                    "tool_choice": "auto"
+                },
+                timeout=90
+            )
+            if resp.status_code == 429:
+                time.sleep(30 * (attempt + 1))
+                continue
+            if not resp.ok:
+                raise Exception(f"API error {resp.status_code}: {resp.text}")
+            return resp.json()
+        except requests.exceptions.ConnectionError:
+            if attempt < retries - 1:
+                time.sleep(10)
+                continue
+            raise
+    raise Exception("Failed after retries. Please try again.")
 
 def run_tool(name, args):
     if name == "web_search":
@@ -112,7 +118,7 @@ def run_agent(topic: str, on_update=None):
     while loop_count < max_loops:
         loop_count += 1
 
-        data = call_mistral(messages)
+        data = call_llm(messages)
         choice = data["choices"][0]
         msg = choice["message"]
         finish_reason = choice["finish_reason"]
